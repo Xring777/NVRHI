@@ -115,13 +115,30 @@ namespace nvrhi::d3d12
 
         auto normalizeStateForCommandList = [this](ResourceStates state)
         {
-            if (m_Desc.queueType == CommandQueue::Graphics)
-                return state;
-
-            if ((state & ResourceStates::ShaderResource) != 0)
+            if (m_Desc.queueType == CommandQueue::Compute &&
+                (state & ResourceStates::ShaderResource) != 0)
+            {
                 state = (state & ~ResourceStates::ShaderResource) | ResourceStates::NonPixelShaderResource;
+            }
 
             return state;
+        };
+
+        auto hasOnlyStateBits = [](ResourceStates state, ResourceStates allowedStates)
+        {
+            return (uint32_t(state) & ~uint32_t(allowedStates)) == 0;
+        };
+
+        const ResourceStates copyQueueStates = ResourceStates::Common | ResourceStates::CopyDest | ResourceStates::CopySource;
+
+        auto reportInvalidCopyQueueBarrier = [this](const char* resourceType, const std::string& debugName, ResourceStates before, ResourceStates after)
+        {
+            std::stringstream ss;
+            ss << "Copy command list cannot transition " << resourceType << " "
+               << debugName << " from 0x" << std::hex << uint32_t(before)
+               << " to 0x" << std::hex << uint32_t(after)
+               << ". Only Common, CopySource, and CopyDest are valid on the Copy queue.";
+            m_Context.error(ss.str());
         };
 
         // Convert the texture barriers into D3D equivalents
@@ -141,6 +158,19 @@ namespace nvrhi::d3d12
             }
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
+
+            if (m_Desc.queueType == CommandQueue::Copy)
+            {
+                if (!hasOnlyStateBits(barrier.stateBefore, copyQueueStates) ||
+                    !hasOnlyStateBits(barrier.stateAfter, copyQueueStates))
+                {
+                    reportInvalidCopyQueueBarrier("texture", barrier.texture->descRef.debugName, barrier.stateBefore, barrier.stateAfter);
+                }
+
+                // Texture copies on the Copy queue use COMMON layout/implicit copy access.
+                // Emitting legacy CopyDest/CopySource barriers produces incompatible enhanced-barrier layouts on recent D3D12 debug layers.
+                continue;
+            }
 
             const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(normalizeStateForCommandList(barrier.stateBefore));
             const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(normalizeStateForCommandList(barrier.stateAfter));
@@ -178,6 +208,14 @@ namespace nvrhi::d3d12
             const Buffer* buffer = static_cast<const Buffer*>(barrier.buffer);
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
+
+            if (m_Desc.queueType == CommandQueue::Copy &&
+                (!hasOnlyStateBits(barrier.stateBefore, copyQueueStates) ||
+                    !hasOnlyStateBits(barrier.stateAfter, copyQueueStates)))
+            {
+                reportInvalidCopyQueueBarrier("buffer", barrier.buffer->descRef.debugName, barrier.stateBefore, barrier.stateAfter);
+                continue;
+            }
 
             const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(normalizeStateForCommandList(barrier.stateBefore));
             const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(normalizeStateForCommandList(barrier.stateAfter));
