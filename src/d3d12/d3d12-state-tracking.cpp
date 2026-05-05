@@ -113,11 +113,15 @@ namespace nvrhi::d3d12
         m_D3DBarriers.clear();
         m_D3DBarriers.reserve(barrierCount);
 
-        auto isShaderResourceNarrowingForNonGraphicsQueue = [this](ResourceStates before, ResourceStates after)
+        auto normalizeStateForCommandList = [this](ResourceStates state)
         {
-            return m_Desc.queueType != CommandQueue::Graphics &&
-                (before & ResourceStates::ShaderResource) != 0 &&
-                after == ResourceStates::NonPixelShaderResource;
+            if (m_Desc.queueType == CommandQueue::Graphics)
+                return state;
+
+            if ((state & ResourceStates::ShaderResource) != 0)
+                state = (state & ~ResourceStates::ShaderResource) | ResourceStates::NonPixelShaderResource;
+
+            return state;
         };
 
         // Convert the texture barriers into D3D equivalents
@@ -137,13 +141,9 @@ namespace nvrhi::d3d12
             }
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
-            if (isShaderResourceNarrowingForNonGraphicsQueue(barrier.stateBefore, barrier.stateAfter))
-            {
-                continue;
-            }
 
-            const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(barrier.stateBefore);
-            const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(barrier.stateAfter);
+            const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(normalizeStateForCommandList(barrier.stateBefore));
+            const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(normalizeStateForCommandList(barrier.stateAfter));
             if (stateBefore != stateAfter)
             {
                 d3dbarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -178,13 +178,9 @@ namespace nvrhi::d3d12
             const Buffer* buffer = static_cast<const Buffer*>(barrier.buffer);
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
-            if (isShaderResourceNarrowingForNonGraphicsQueue(barrier.stateBefore, barrier.stateAfter))
-            {
-                continue;
-            }
 
-            const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(barrier.stateBefore);
-            const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(barrier.stateAfter);
+            const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(normalizeStateForCommandList(barrier.stateBefore));
+            const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(normalizeStateForCommandList(barrier.stateAfter));
             if (stateBefore != stateAfter && 
                 (stateBefore & D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE) == 0 &&
                 (stateAfter & D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE) == 0)
