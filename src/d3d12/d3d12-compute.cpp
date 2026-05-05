@@ -98,6 +98,9 @@ namespace nvrhi::d3d12
 
     void CommandList::setComputeState(const ComputeState& state)
     {
+        if (!requireCommandQueue(CommandQueue::Compute, "setComputeState"))
+            return;
+
         ComputePipeline* pso = checked_cast<ComputePipeline*>(state.pipeline);
 
         const bool updateRootSignature = !m_CurrentComputeStateValid || m_CurrentComputeState.pipeline == nullptr ||
@@ -165,6 +168,9 @@ namespace nvrhi::d3d12
 
     void CommandList::dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ)
     {
+        if (!requireCommandQueue(CommandQueue::Compute, "dispatch"))
+            return;
+
         updateComputeVolatileBuffers();
 
         m_ActiveCommandList->commandList->Dispatch(groupsX, groupsY, groupsZ);
@@ -172,6 +178,9 @@ namespace nvrhi::d3d12
 
     void CommandList::dispatchIndirect(uint32_t offsetBytes)
     {
+        if (!requireCommandQueue(CommandQueue::Compute, "dispatchIndirect"))
+            return;
+
         Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentComputeState.indirectParams);
         assert(indirectParams); // validation layer handles this
 

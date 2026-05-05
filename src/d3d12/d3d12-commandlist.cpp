@@ -28,6 +28,22 @@
 
 namespace nvrhi::d3d12
 {
+    namespace
+    {
+        const char* commandQueueName(CommandQueue queue) noexcept
+        {
+            switch (queue)
+            {
+            case CommandQueue::Graphics: return "Graphics";
+            case CommandQueue::Compute: return "Compute";
+            case CommandQueue::Copy: return "Copy";
+            case CommandQueue::Count: return "Count";
+            }
+
+            return "Unknown";
+        }
+    }
+
     CommandList::CommandList(Device* device, const Context& context, DeviceResources& resources, const CommandListParameters& params)
         : m_Context(context)
         , m_Resources(resources)
@@ -74,6 +90,21 @@ namespace nvrhi::d3d12
         default:
             return nullptr;
         }
+    }
+
+    bool CommandList::requireCommandQueue(CommandQueue requiredQueue, const char* operation) const
+    {
+        if (int(m_Desc.queueType) <= int(requiredQueue))
+        {
+            return true;
+        }
+
+        std::stringstream ss;
+        ss << "This command list has type " << commandQueueName(m_Desc.queueType)
+           << ", but the '" << operation << "' operation requires at least "
+           << commandQueueName(requiredQueue) << ".";
+        m_Context.error(ss.str());
+        return false;
     }
 
     std::shared_ptr<InternalCommandList> CommandList::createInternalCommandList() const
@@ -172,7 +203,19 @@ namespace nvrhi::d3d12
 
     void CommandList::beginMarker(const char* name)
     {
+        if (!m_ActiveCommandList || !m_ActiveCommandList->commandList)
+        {
+            m_Context.error("beginMarker called without an active D3D12 command list.");
+            return;
+        }
+
+        if (m_Desc.queueType == CommandQueue::Copy)
+        {
+            return;
+        }
+
         PIXBeginEvent(m_ActiveCommandList->commandList, 0, name);
+        ++m_MarkerDepth;
 #if NVRHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
         {
@@ -184,7 +227,20 @@ namespace nvrhi::d3d12
 
     void CommandList::endMarker()
     {
+        if (m_MarkerDepth == 0)
+        {
+            return;
+        }
+
+        if (!m_ActiveCommandList || !m_ActiveCommandList->commandList)
+        {
+            m_Context.error("endMarker called without an active D3D12 command list.");
+            m_MarkerDepth = 0;
+            return;
+        }
+
         PIXEndEvent(m_ActiveCommandList->commandList);
+        --m_MarkerDepth;
 #if NVRHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
             m_AftermathTracker.popEvent();
@@ -260,6 +316,7 @@ namespace nvrhi::d3d12
         }
 
         m_ActiveCommandList = chunk;
+        m_MarkerDepth = 0;
 
         m_Instance = std::make_shared<CommandListInstance>();
         m_Instance->commandAllocator = m_ActiveCommandList->allocator;
@@ -321,6 +378,7 @@ namespace nvrhi::d3d12
         m_ActiveCommandList->commandList->Close();
 
         clearStateCache();
+        m_MarkerDepth = 0;
 
         m_CurrentUploadBuffer = nullptr;
         m_VolatileConstantBufferAddresses.clear();

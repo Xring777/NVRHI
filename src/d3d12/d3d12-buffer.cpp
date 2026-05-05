@@ -540,6 +540,9 @@ namespace nvrhi::d3d12
 
     void CommandList::clearBufferUInt(IBuffer* _b, uint32_t clearValue)
     {
+        if (!requireCommandQueue(CommandQueue::Compute, "clearBufferUInt"))
+            return;
+
         Buffer* b = checked_cast<Buffer*>(_b);
 
         if (!b->desc.canHaveUAVs)

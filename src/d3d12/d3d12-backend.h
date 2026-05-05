@@ -958,6 +958,7 @@ namespace nvrhi::d3d12
         void requireTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates state);
         void requireSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates state);
         void requireBufferState(IBuffer* buffer, ResourceStates state);
+        bool requireCommandQueue(CommandQueue requiredQueue, const char* operation) const;
         ID3D12CommandList* getD3D12CommandList() const { return m_ActiveCommandList->commandList; }
 
         // IResource implementation
@@ -1096,6 +1097,7 @@ namespace nvrhi::d3d12
         std::list<std::shared_ptr<InternalCommandList>> m_CommandListPool;
         std::shared_ptr<CommandListInstance> m_Instance;
         uint64_t m_RecordingVersion = 0;
+        uint32_t m_MarkerDepth = 0;
 #if NVRHI_WITH_AFTERMATH
         AftermathMarkerTracker m_AftermathTracker;
 #endif

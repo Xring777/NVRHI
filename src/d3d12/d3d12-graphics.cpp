@@ -294,6 +294,9 @@ namespace nvrhi::d3d12
 
     void CommandList::setGraphicsState(const GraphicsState& state)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "setGraphicsState"))
+            return;
+
         GraphicsPipeline* pso = checked_cast<GraphicsPipeline*>(state.pipeline);
         Framebuffer* framebuffer = checked_cast<Framebuffer*>(state.framebuffer);
 
@@ -561,6 +564,9 @@ namespace nvrhi::d3d12
 
     void CommandList::draw(const DrawArguments& args)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "draw"))
+            return;
+
         updateGraphicsVolatileBuffers();
 
         m_ActiveCommandList->commandList->DrawInstanced(args.vertexCount, args.instanceCount, args.startVertexLocation, args.startInstanceLocation);
@@ -568,6 +574,9 @@ namespace nvrhi::d3d12
 
     void CommandList::drawIndexed(const DrawArguments& args)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "drawIndexed"))
+            return;
+
         updateGraphicsVolatileBuffers();
 
         m_ActiveCommandList->commandList->DrawIndexedInstanced(args.vertexCount, args.instanceCount, args.startIndexLocation, args.startVertexLocation, args.startInstanceLocation);
@@ -575,6 +584,9 @@ namespace nvrhi::d3d12
 
     void CommandList::drawIndirect(uint32_t offsetBytes, uint32_t drawCount)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "drawIndirect"))
+            return;
+
         Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentGraphicsState.indirectParams);
         assert(indirectParams); // validation layer handles this
 
@@ -585,6 +597,9 @@ namespace nvrhi::d3d12
 
     void CommandList::drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "drawIndexedIndirect"))
+            return;
+
         Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentGraphicsState.indirectParams);
         assert(indirectParams);
 
@@ -595,6 +610,9 @@ namespace nvrhi::d3d12
 
     void CommandList::drawIndexedIndirectCount(uint32_t paramOffsetBytes, uint32_t countOffsetBytes, uint32_t maxDrawCount)
     {
+        if (!requireCommandQueue(CommandQueue::Graphics, "drawIndexedIndirectCount"))
+            return;
+
         Buffer* paramBuffer = checked_cast<Buffer*>(m_CurrentGraphicsState.indirectParams);
         Buffer* countBuffer = checked_cast<Buffer*>(m_CurrentGraphicsState.indirectCountBuffer);
         assert(paramBuffer);
