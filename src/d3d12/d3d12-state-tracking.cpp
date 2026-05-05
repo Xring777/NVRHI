@@ -33,6 +33,9 @@ namespace nvrhi::d3d12
             return; // is bindless
 
         BindingSet* bindingSet = checked_cast<BindingSet*>(_bindingSet);
+        const ResourceStates shaderResourceState = (m_Desc.queueType == CommandQueue::Graphics)
+            ? ResourceStates::ShaderResource
+            : ResourceStates::NonPixelShaderResource;
 
         for (auto bindingIndex : bindingSet->bindingsThatNeedTransitions)
         {
@@ -41,7 +44,7 @@ namespace nvrhi::d3d12
             switch (binding.type)  // NOLINT(clang-diagnostic-switch-enum)
             {
             case ResourceType::Texture_SRV:
-                requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::ShaderResource);
+                requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, shaderResourceState);
                 break;
 
             case ResourceType::Texture_UAV:
@@ -51,7 +54,7 @@ namespace nvrhi::d3d12
             case ResourceType::TypedBuffer_SRV:
             case ResourceType::StructuredBuffer_SRV:
             case ResourceType::RawBuffer_SRV:
-                requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), ResourceStates::ShaderResource);
+                requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), shaderResourceState);
                 break;
 
             case ResourceType::TypedBuffer_UAV:
@@ -110,6 +113,13 @@ namespace nvrhi::d3d12
         m_D3DBarriers.clear();
         m_D3DBarriers.reserve(barrierCount);
 
+        auto isShaderResourceNarrowingForNonGraphicsQueue = [this](ResourceStates before, ResourceStates after)
+        {
+            return m_Desc.queueType != CommandQueue::Graphics &&
+                (before & ResourceStates::ShaderResource) != 0 &&
+                after == ResourceStates::NonPixelShaderResource;
+        };
+
         // Convert the texture barriers into D3D equivalents
         for (const auto& barrier : textureBarriers)
         {
@@ -127,6 +137,11 @@ namespace nvrhi::d3d12
             }
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
+            if (isShaderResourceNarrowingForNonGraphicsQueue(barrier.stateBefore, barrier.stateAfter))
+            {
+                continue;
+            }
+
             const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(barrier.stateBefore);
             const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(barrier.stateAfter);
             if (stateBefore != stateAfter)
@@ -163,6 +178,11 @@ namespace nvrhi::d3d12
             const Buffer* buffer = static_cast<const Buffer*>(barrier.buffer);
 
             D3D12_RESOURCE_BARRIER d3dbarrier{};
+            if (isShaderResourceNarrowingForNonGraphicsQueue(barrier.stateBefore, barrier.stateAfter))
+            {
+                continue;
+            }
+
             const D3D12_RESOURCE_STATES stateBefore = convertResourceStates(barrier.stateBefore);
             const D3D12_RESOURCE_STATES stateAfter = convertResourceStates(barrier.stateAfter);
             if (stateBefore != stateAfter && 

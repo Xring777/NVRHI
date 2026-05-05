@@ -374,6 +374,7 @@ namespace nvrhi
         OpacityMicromapBuildInput   = 0x00400000,
         ConvertCoopVecMatrixInput   = 0x00800000,
         ConvertCoopVecMatrixOutput  = 0x01000000,
+        NonPixelShaderResource      = 0x02000000,
     };
 
     NVRHI_ENUM_CLASS_FLAG_OPERATORS(ResourceStates)

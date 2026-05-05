@@ -30,6 +30,12 @@ namespace nvrhi
 {
     bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, IMessageCallback* messageCallback)
     {
+        if ((requiredState & ResourceStates::NonPixelShaderResource) != 0 &&
+            (permanentState & ResourceStates::ShaderResource) != 0)
+        {
+            requiredState = (requiredState & ~ResourceStates::NonPixelShaderResource) | ResourceStates::ShaderResource;
+        }
+
         if ((permanentState & requiredState) != requiredState)
         {
             std::stringstream ss;
